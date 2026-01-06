@@ -11,7 +11,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from ijazah_parser import IjazahParser
 
 # Setup logging
-log_filename = f"scraper_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+log_filename = f"scraper_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -22,14 +22,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class MitraScraper:
-    def __init__(self):
+class MitraScraperTest:
+    def __init__(self, max_rows=5):
         # Create output folder with timestamp for versioning
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.output_folder = f"output_{timestamp}"
+        self.output_folder = f"output_test_{timestamp}"
         self.base_download_dir = os.path.join(self.output_folder, "downloads")
         
         self.data_list = []
+        self.max_rows = max_rows  # Limit untuk testing
         self.stats = {
             'total': 0,
             'success': 0,
@@ -396,14 +397,14 @@ class MitraScraper:
             
             return False
 
-    def save_to_excel(self, filename="mitra_data.xlsx"):
+    def save_to_excel(self, filename="mitra_data_test.xlsx"):
         """Save data to Excel with formatting"""
         filepath = os.path.join(self.output_folder, filename)
         logger.info(f"\nSaving data to Excel: {filepath}")
         
         wb = Workbook()
         ws = wb.active
-        ws.title = "Data Mitra"
+        ws.title = "Data Mitra Test"
         
         # Headers - Kolom utama di depan
         headers = [
@@ -484,7 +485,7 @@ class MitraScraper:
         wb.save(filepath)
         logger.info(f"✓ Excel file saved: {filepath}")
 
-    def save_to_csv(self, filename="mitra_data.csv"):
+    def save_to_csv(self, filename="mitra_data_test.csv"):
         """Save data to CSV"""
         filepath = os.path.join(self.output_folder, filename)
         logger.info(f"Saving CSV backup: {filepath}")
@@ -506,9 +507,9 @@ class MitraScraper:
     def print_summary(self):
         """Print scraping summary"""
         logger.info(f"\n{'='*60}")
-        logger.info("SCRAPING SUMMARY")
+        logger.info("TESTING SUMMARY")
         logger.info(f"{'='*60}")
-        logger.info(f"Pages processed: {self.stats['pages_processed']}")
+        logger.info(f"Max rows (limit): {self.max_rows}")
         logger.info(f"Total rows processed: {self.stats['total']}")
         logger.info(f"✓ Successful: {self.stats['success']}")
         logger.info(f"✗ Failed: {self.stats['failed']}")
@@ -518,9 +519,9 @@ class MitraScraper:
         logger.info(f"{'='*60}")
 
     def run(self):
-        """Main scraping process"""
+        """Main scraping process - LIMITED TO max_rows"""
         logger.info("="*60)
-        logger.info("MITRA BPS SCRAPER - STARTING")
+        logger.info(f"MITRA BPS SCRAPER - TESTING MODE (Max {self.max_rows} rows)")
         logger.info("="*60)
         logger.info(f"Log file: {log_filename}")
         
@@ -550,27 +551,8 @@ class MitraScraper:
                 logger.info(f"✓ Connected to: {page.title()}")
                 logger.info(f"✓ URL: {page.url}")
                 
-                # Wait for table with multiple strategies
+                # Wait for table
                 logger.info("\nWaiting for table to load...")
-                
-                # Strategy 1: Wait for table to exist
-                try:
-                    page.wait_for_selector("table#vgt-table tbody tr", state="attached", timeout=5000)
-                    logger.info("✓ Table found (attached)")
-                except Exception:
-                    logger.warning("Table not found with 'attached' state, trying alternative...")
-                
-                # Strategy 2: Wait for loading overlay to disappear
-                try:
-                    overlay = page.locator(".velmld-overlay")
-                    if overlay.count() > 0:
-                        logger.info("Waiting for loading overlay to disappear...")
-                        page.wait_for_selector(".velmld-overlay", state="hidden", timeout=15000)
-                        logger.info("✓ Loading overlay hidden")
-                except Exception:
-                    logger.info("No loading overlay found or already hidden")
-                
-                # Strategy 3: Just wait a bit for any animations
                 page.wait_for_timeout(2000)
                 
                 # Get all rows
@@ -583,85 +565,28 @@ class MitraScraper:
                     nik_link = row.locator('span[title="Lihat Detail Mitra"]')
                     if nik_link.count() > 0:
                         data_rows.append(row)
+                        # LIMIT: Stop jika sudah mencapai max_rows
+                        if len(data_rows) >= self.max_rows:
+                            break
                 
                 self.stats['total'] = len(data_rows)
                 
                 if len(data_rows) == 0:
                     logger.error("✗ No data rows found in table!")
-                    logger.info(f"Total rows found: {len(all_rows)}")
-                    logger.info("Please ensure:")
-                    logger.info("  1. You are logged in")
-                    logger.info("  2. You are on the 'Seleksi Mitra' page")
-                    logger.info("  3. The table has loaded completely")
-                    logger.info("  4. There are actually data rows (not just headers)")
                     return
                 
-                logger.info(f"✓ Found {len(data_rows)} data rows (skipped {len(all_rows) - len(data_rows)} header rows)")
-                
-                # Detect total pages
-                try:
-                    page_info = page.locator('.footer__navigation__page-info__current-entry + span').inner_text()
-                    total_pages = page_info.replace('dari', '').strip()
-                    logger.info(f"✓ Detected total pages: {total_pages}")
-                except Exception:
-                    total_pages = "unknown"
-                    logger.info("⚠ Could not detect total pages")
-                
+                logger.info(f"✓ Found {len(data_rows)} data rows (limited to {self.max_rows})")
                 logger.info("\nStarting data extraction...\n")
                 
-                # Pagination loop
-                current_page = 1
-                has_next_page = True
-                
-                while has_next_page:
-                    logger.info(f"\n{'='*60}")
-                    logger.info(f"PROCESSING PAGE {current_page}")
-                    logger.info(f"{'='*60}\n")
+                # Process rows (limited)
+                for i, row in enumerate(data_rows):
+                    self.process_row(row, i, page)
                     
-                    # Process each data row on current page
-                    for i, row in enumerate(data_rows):
-                        self.process_row(row, i, page)
-                        
-                        # Small delay between rows
-                        page.wait_for_timeout(500)
+                    # Progress indicator
+                    logger.info(f"\n--- Progress: {i+1}/{len(data_rows)} ---\n")
                     
-                    # Increment pages counter
-                    self.stats['pages_processed'] = current_page
-                    
-                    # Check if there's a next page button
-                    try:
-                        # Look for "Selanjutnya" button that's NOT disabled
-                        next_button = page.locator('button.footer__navigation__page-btn:has-text("Selanjutnya"):not(.disabled)')
-                        
-                        if next_button.count() > 0 and next_button.is_visible():
-                            logger.info(f"\n✓ Page {current_page} completed. Moving to next page...")
-                            next_button.click()
-                            page.wait_for_timeout(3000)  # Wait for page to load
-                            
-                            # Wait for loading overlay to disappear
-                            try:
-                                overlay = page.locator(".velmld-overlay")
-                                if overlay.count() > 0:
-                                    page.wait_for_selector(".velmld-overlay", state="hidden", timeout=15000)
-                            except Exception:
-                                pass
-                            
-                            # Re-fetch rows for new page
-                            all_rows = page.locator("table#vgt-table tbody tr").all()
-                            data_rows = []
-                            for row in all_rows:
-                                nik_link = row.locator('span[title="Lihat Detail Mitra"]')
-                                if nik_link.count() > 0:
-                                    data_rows.append(row)
-                            
-                            current_page += 1
-                            logger.info(f"✓ Found {len(data_rows)} rows on page {current_page}")
-                        else:
-                            logger.info(f"\n✓ No more pages. Completed {current_page} page(s).")
-                            has_next_page = False
-                    except Exception as e:
-                        logger.info(f"\n✓ Reached last page or pagination error: {str(e)}")
-                        has_next_page = False
+                    # Small delay between rows to avoid overwhelming the system
+                    page.wait_for_timeout(500)
                 
                 logger.info("\n✓ All rows processed")
                 
@@ -678,8 +603,9 @@ class MitraScraper:
         
         # Print summary
         self.print_summary()
-        logger.info(f"\n✓ Scraping completed! Check {log_filename} for details.")
+        logger.info(f"\n✓ Testing completed! Check {log_filename} for details.")
 
 if __name__ == "__main__":
-    scraper = MitraScraper()
+    # Testing dengan 3 orang pertama
+    scraper = MitraScraperTest(max_rows=3)
     scraper.run()

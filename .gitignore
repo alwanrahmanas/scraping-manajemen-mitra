@@ -11,10 +11,16 @@ ENV/
 dist/
 build/
 
+# Environment variables
+.env
+
 # Output files
 mitra_data.xlsx
 mitra_data.csv
 downloads/
+downloads_test/
+output_*/
+output_test_*/
 *.log
 
 # IDE

@@ -1,31 +1,37 @@
 @echo off
-echo ========================================
-echo Mitra BPS Scraper
-echo ========================================
+echo ============================================
+echo Running Mitra BPS Scraper
+echo ============================================
 echo.
 
-echo Memastikan Chrome dengan debugging sudah berjalan...
-echo Jika belum, jalankan: start_chrome.bat
+echo IMPORTANT:
+echo 1. Make sure Chrome is running (start_chrome.bat)
+echo 2. Make sure you are logged in to the website
+echo 3. Make sure you are on the "Seleksi Mitra" page
 echo.
 
-echo Memulai scraping...
-echo Progress akan ditampilkan di console dan disimpan ke log file
+set /p confirm="Ready to start scraping? (Y/N): "
+if /i "%confirm%" NEQ "Y" (
+    echo Scraping cancelled.
+    pause
+    exit /b
+)
+
 echo.
+echo Starting scraper...
+echo.
+
 python scrape_mitra.py
 
 echo.
-echo ========================================
-echo Scraping selesai!
-echo ========================================
+echo ============================================
+echo Scraping finished!
+echo ============================================
 echo.
-echo Hasil tersimpan di:
-echo - mitra_data.xlsx (Excel dengan formatting)
+echo Check the output files:
+echo - mitra_data.xlsx (Excel with formatting)
 echo - mitra_data.csv (CSV backup)
-echo - downloads/ (foto KTP dan Ijazah)
-echo - scraper_*.log (log file detail)
-echo.
-echo Buka file Excel untuk melihat data dengan format yang rapi!
-echo Buka file log untuk melihat detail proses scraping.
+echo - downloads\ folder (KTP and Ijazah images)
+echo - scraper_*.log (detailed log file)
 echo.
 pause
-
