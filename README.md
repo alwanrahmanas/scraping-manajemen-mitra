@@ -8,12 +8,12 @@ Aplikasi ini akan membantu Anda mengambil data mitra (NIK, rekening, ijazah, dll
 
 ## 📖 Daftar Isi
 
-- [Apa yang Bisa Dilakukan?](#-apa-yang-bisa-dilakukan)
-- [Persiapan Awal](#-persiapan-awal)
-- [Cara Menggunakan](#-cara-menggunakan)
-- [Hasil Output](#-hasil-output)
-- [Troubleshooting](#-troubleshooting)
-- [FAQ](#-faq)
+- [🎯 Apa yang Bisa Dilakukan?](#-apa-yang-bisa-dilakukan)
+- [🛠️ Persiapan Awal](#️-persiapan-awal)
+- [🚀 Cara Menggunakan](#-cara-menggunakan)
+- [📊 Hasil Output](#-hasil-output)
+- [🐛 Troubleshooting](#-troubleshooting)
+- [❓ FAQ (Pertanyaan Umum)](#-faq-pertanyaan-umum)
 
 ---
 
@@ -100,6 +100,11 @@ Tunggu sampai selesai. Jika berhasil, akan muncul pesan "Setup selesai!"
    - Pastikan halaman tabel mitra sudah terbuka
 
 3. **Jangan tutup Chrome** selama proses scraping!
+
+---
+## 📸 Contoh Tampilan Aplikasi Manajemen Mitra
+
+![Halaman Seleksi Mitra BPS](images/seleksi-mitra.png)
 
 ---
 
