@@ -63,11 +63,11 @@ OpenAI memberikan **$5 credit gratis** untuk akun baru (berlaku 3 bulan).
 ### **Biaya Parsing Ijazah**
 
 - Model yang digunakan: `gpt-4o-mini`
-- Biaya per ijazah: ~$0.01 - $0.02
+- Biaya per ijazah: ~$0.001 - $0.002
 - Contoh:
-  - 100 ijazah = ~$1-2
-  - 500 ijazah = ~$5-10
-  - 1000 ijazah = ~$10-20
+  - 100 ijazah = ~$0.1-0.2
+  - 500 ijazah = ~$0.5-1
+  - 1000 ijazah = ~$1-2
 
 ### **Top Up**
 
