@@ -30,6 +30,8 @@ Tool ini akan:
    - NIM, Program Studi, Fakultas, Universitas
 4. ✅ **Menyimpan semua data** dalam file Excel yang rapi
 5. ✅ **Membersihkan nomor rekening** (hanya angka)
+6. ✅ **Otomatis mendeteksi mismatch** data (Baris merah di Excel jika data aneh)
+
 
 **Hasil:** Anda akan mendapat file Excel berisi semua data mitra yang lengkap!
 
