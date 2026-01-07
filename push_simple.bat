@@ -50,7 +50,7 @@ pause
 
 echo.
 echo Pushing to GitHub...
-git push -f origin main
+git push -f origin master
 
 if %errorlevel% equ 0 (
     echo.
@@ -68,7 +68,7 @@ if %errorlevel% equ 0 (
     echo Troubleshooting:
     echo 1. Check internet connection
     echo 2. Verify GitHub access
-    echo 3. Try manual push: git push -f origin main
+    echo 3. Try manual push: git push -f origin master
 )
 
 echo.

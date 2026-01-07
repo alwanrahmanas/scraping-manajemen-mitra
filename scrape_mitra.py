@@ -278,7 +278,7 @@ class MitraScraper:
                 
                 for selector in selectors:
                     try:
-                        page.locator(selector).first.click(timeout=5000)
+                        page.locator(selector).first.click(timeout=10000)
                         logger.info(f"✓ Clicked Rekening tab using: {selector}")
                         rekening_clicked = True
                         break
@@ -291,9 +291,25 @@ class MitraScraper:
             except Exception as e:
                 logger.error(f"Error clicking Rekening tab: {e}")
             
-            page.wait_for_timeout(1500)
+            # Wait for Rekening tab content to fully load (prevent race condition)
+            try:
+                page.wait_for_selector('label:has-text("Nama Bank")', state="visible", timeout=8000)
+                logger.info("✓ Rekening tab content loaded")
+                page.wait_for_timeout(800)  # Extra buffer for dynamic content
+            except PlaywrightTimeoutError:
+                logger.warning("⚠ Rekening content load timeout - continuing anyway")
+                page.wait_for_timeout(2000)
             
             nama_bank, no_rekening, nama_pemilik = self.extract_bank_info(page)
+            
+            # Validate scraped data to detect potential mismatch
+            has_mismatch = False
+            if no_rekening != "N/A" and not no_rekening.replace('-', '').replace(' ', '').isdigit():
+                has_mismatch = True
+                logger.error(f"⚠ POTENTIAL MISMATCH DETECTED for NIK {nik_text}!")
+                logger.error(f"  Nomor Rekening contains non-numeric: '{no_rekening}'")
+                logger.error(f"  Nama Pemilik: '{nama_pemilik}'")
+                logger.error(f"  This data may be incorrect - please verify manually!")
             
             # Store data
             row_data = {
@@ -303,7 +319,8 @@ class MitraScraper:
                 "Nama Pemilik": nama_pemilik,
                 "Path KTP": ktp_path if ktp_path else "Not Downloaded",
                 "Path Ijazah": ijazah_path if ijazah_path else "Not Downloaded",
-                "Status": "Success"
+                "Status": "Success",
+                "_has_mismatch": has_mismatch  # Internal flag for Excel highlighting
             }
             
             # Tambahkan data parsing ijazah jika tersedia
@@ -343,18 +360,26 @@ class MitraScraper:
                 logger.info(f"  Ijazah Gelar: {ijazah_data.get('gelar', 'N/A')}")
                 logger.info(f"  Universitas: {ijazah_data.get('universitas', 'N/A')}")
             
-            # Close modal with multiple attempts
+            # Close modal with multiple attempts and verification
             try:
                 page.keyboard.press("Escape")
                 page.wait_for_timeout(500)
+                # Verify modal is actually closed
+                try:
+                    page.wait_for_selector(".v--modal-box", state="hidden", timeout=3000)
+                    logger.info("✓ Modal closed successfully")
+                except PlaywrightTimeoutError:
+                    logger.warning("⚠ Modal may still be visible after Escape")
             except Exception as e:
                 logger.warning(f"Error closing modal with Escape: {e}")
                 # Try clicking close button
                 try:
                     page.locator('button.close, .modal-close, [aria-label="Close"]').first.click(timeout=2000)
                     page.wait_for_timeout(500)
+                    page.wait_for_selector(".v--modal-box", state="hidden", timeout=3000)
+                    logger.info("✓ Modal closed via button")
                 except Exception:
-                    logger.warning("Could not close modal - continuing anyway")
+                    logger.warning("⚠ Could not verify modal closure - continuing anyway")
             
             self.stats['success'] += 1
             return True
@@ -434,8 +459,9 @@ class MitraScraper:
             cell.font = header_font
             cell.alignment = Alignment(horizontal='center', vertical='center')
         
-        # Add data rows
-        for row_data in self.data_list:
+        # Add data rows with conditional formatting
+        mismatch_count = 0
+        for row_idx, row_data in enumerate(self.data_list, start=2):  # Start at row 2 (after header)
             ws.append([
                 row_data.get("NIK", ""),
                 row_data.get("Ijazah_Nama_Gelar", "N/A"),
@@ -453,6 +479,21 @@ class MitraScraper:
                 row_data.get("Path Ijazah", ""),
                 row_data.get("Status", "")
             ])
+            
+            # Highlight rows with potential mismatch
+            if row_data.get("_has_mismatch", False):
+                mismatch_count += 1
+                # Red/orange fill for mismatch rows
+                mismatch_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+                mismatch_font = Font(color="9C0006", bold=True)
+                
+                for cell in ws[row_idx]:
+                    cell.fill = mismatch_fill
+                    # Highlight Nomor Rekening column specifically
+                    if cell.column == 3:  # Column C (Nomor Rekening)
+                        cell.font = mismatch_font
+        
+        logger.info(f"✓ Highlighted {mismatch_count} rows with potential mismatch")
         
         # Auto-adjust column widths
         for column in ws.columns:
@@ -481,8 +522,45 @@ class MitraScraper:
             for cell in row:
                 cell.border = thin_border
         
+        # Create Summary Sheet
+        ws_summary = wb.create_sheet("Summary", 0)  # Insert at beginning
+        ws_summary.append(["SCRAPING SUMMARY & DATA QUALITY REPORT"])
+        ws_summary.append([])
+        ws_summary.append(["Metric", "Value"])
+        ws_summary.append(["Total Rows Scraped", len(self.data_list)])
+        ws_summary.append(["Rows with Potential Mismatch", mismatch_count])
+        ws_summary.append(["Data Quality Rate", f"{((len(self.data_list) - mismatch_count) / len(self.data_list) * 100):.1f}%" if self.data_list else "N/A"])
+        ws_summary.append([])
+        ws_summary.append(["LEGEND:"])
+        ws_summary.append(["🔴 Red/Pink Rows", "= Potential mismatch detected (Nomor Rekening contains non-numeric characters)"])
+        ws_summary.append(["⚠️ Action Required", "= Please verify these rows manually"])
+        ws_summary.append([])
+        ws_summary.append(["Note:", "Mismatch detection helps identify data quality issues where account number may have been incorrectly scraped."])
+        
+        # Format summary sheet
+        ws_summary['A1'].font = Font(bold=True, size=14, color="FFFFFF")
+        ws_summary['A1'].fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        ws_summary['A1'].alignment = Alignment(horizontal='center')
+        ws_summary.merge_cells('A1:B1')
+        
+        # Format metric headers
+        for cell in ws_summary[3]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+        
+        # Highlight mismatch count if > 0
+        if mismatch_count > 0:
+            ws_summary['B5'].font = Font(bold=True, color="9C0006")
+            ws_summary['B5'].fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        
+        # Auto-adjust summary column widths
+        ws_summary.column_dimensions['A'].width = 30
+        ws_summary.column_dimensions['B'].width = 60
+        
         wb.save(filepath)
         logger.info(f"✓ Excel file saved: {filepath}")
+        if mismatch_count > 0:
+            logger.info(f"⚠ {mismatch_count} rows highlighted in red - please verify manually!")
 
     def save_to_csv(self, filename="mitra_data.csv"):
         """Save data to CSV"""
